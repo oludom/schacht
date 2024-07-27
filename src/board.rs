@@ -1,4 +1,5 @@
 use core::fmt;
+use std::arch::x86_64::_MM_FROUND_CUR_DIRECTION;
 
 pub enum Piece {
     Pawn(Color),
@@ -36,17 +37,10 @@ impl Piece {
     pub fn get_color(&self) -> Color {
         use Piece::*;
         match self {
-            Pawn(c)
-            | Rook(c)
-            | Knight(c)
-            | Bishop(c)
-            | Queen(c)
-            | King(c) => *c,
+            Pawn(c) | Rook(c) | Knight(c) | Bishop(c) | Queen(c) | King(c) => *c,
         }
     }
 }
-
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum Position {
@@ -252,7 +246,7 @@ impl Position {
             (7, 5) => Position::H6,
             (7, 6) => Position::H7,
             (7, 7) => Position::H8,
-            _ => panic!("impossible position requested.")
+            _ => panic!("impossible position requested."),
         }
     }
 }
@@ -287,13 +281,6 @@ pub const BLACK: Color = Color::Black;
 
 type BitBoard = u64;
 
-// FEN notation
-/*
-starting position
-rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
-
- */
-
 pub struct Board {
     b_pawn: BitBoard,
     b_rook: BitBoard,
@@ -323,6 +310,8 @@ const RANK4: u8 = 24;
 const RANK3: u8 = 16;
 const RANK2: u8 = 8;
 const RANK1: u8 = 0;
+const POSITION_CASTLING_KING: u8 = 1;
+const POSITION_CASTLING_QUEEN: u8 = 6;
 
 // 0b00000000 00000000
 const START_PAWN: BitBoard = 0b11111111;
@@ -368,6 +357,26 @@ impl Board {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            b_pawn: 0,
+            b_rook: 0,
+            b_knight: 0,
+            b_bishop: 0,
+            b_queen: 0,
+            b_king: 0,
+            w_pawn: 0,
+            w_rook: 0,
+            w_knight: 0,
+            w_bishop: 0,
+            w_queen: 0,
+            w_king: 0,
+            enpassant: 0,
+            castling: 0,
+            current_to_move: Color::White,
+        }
+    }
+
     pub fn get_piece(&self, p: Position) -> Option<Piece> {
         let (file, rank) = p.get();
         if Self::is_set(file, rank, self.b_pawn) {
@@ -402,17 +411,127 @@ impl Board {
     fn is_set(file: u8, rank: u8, piece: BitBoard) -> bool {
         (piece >> (file + (8 * rank))) & 1 > 0
     }
-}
 
-
-impl From<&str> for Board {
-    // expects FEN notation 
-    fn from(value: &str) -> Self {
-        Board::default()
+    #[inline]
+    fn set(v: &mut BitBoard, pos: u8) {
+        *v |= 1 << pos;
     }
 }
 
+// FEN notation
+/*
+starting position
+rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
 
+ */
+
+impl From<&str> for Board {
+    // expects FEN notation
+    fn from(value: &str) -> Self {
+        let mut b_pawn: BitBoard = 0;
+        let mut b_rook: BitBoard = 0;
+        let mut b_knight: BitBoard = 0;
+        let mut b_bishop: BitBoard = 0;
+        let mut b_queen: BitBoard = 0;
+        let mut b_king: BitBoard = 0;
+        let mut w_pawn: BitBoard = 0;
+        let mut w_rook: BitBoard = 0;
+        let mut w_knight: BitBoard = 0;
+        let mut w_bishop: BitBoard = 0;
+        let mut w_queen: BitBoard = 0;
+        let mut w_king: BitBoard = 0;
+        let mut current_to_move = WHITE;
+        let mut castling: BitBoard = 0;
+        let mut enpassant: BitBoard = 0;
+
+        let mut current_position: u8 = 64;
+        let mut itt = value.chars();
+
+        for c in itt.by_ref() {
+            if current_position > 0 {
+                current_position -= 1;
+            }
+            match c {
+                'r' => Self::set(&mut b_rook, current_position),
+                'R' => Self::set(&mut w_rook, current_position),
+                'n' => Self::set(&mut b_knight, current_position),
+                'N' => Self::set(&mut w_knight, current_position),
+                'b' => Self::set(&mut b_bishop, current_position),
+                'B' => Self::set(&mut w_bishop, current_position),
+                'q' => Self::set(&mut b_queen, current_position),
+                'Q' => Self::set(&mut w_queen, current_position),
+                'k' => Self::set(&mut b_king, current_position),
+                'K' => Self::set(&mut w_king, current_position),
+                'p' => Self::set(&mut b_pawn, current_position),
+                'P' => Self::set(&mut w_pawn, current_position),
+                '/' => {
+                    current_position += 1;
+                    continue;
+                }
+                ' ' => break,
+                n if n.is_numeric() => current_position -= n.to_digit(10).unwrap() as u8 - 1,
+                _ => panic!("unrecognized FEN char for position"),
+            }
+        }
+
+        // match color
+        for c in itt.by_ref() {
+            match c {
+                'w' => current_to_move = WHITE,
+                'b' => current_to_move = BLACK,
+                ' ' => break,
+                s => panic!("unrecognized color {}", s),
+            }
+        }
+
+        // retrieve castling rights
+        for c in itt.by_ref() {
+            match c {
+                'K' => Self::set(&mut castling, POSITION_CASTLING_KING),
+                'k' => Self::set(&mut castling, POSITION_CASTLING_KING + RANK8),
+                'Q' => Self::set(&mut castling, POSITION_CASTLING_QUEEN),
+                'q' => Self::set(&mut castling, POSITION_CASTLING_QUEEN + RANK8),
+                ' ' => break,
+                '-' => continue,
+                _ => panic!("unrecognized FEN char for castling rights"),
+            }
+        }
+
+        let mut rank = 0;
+        let mut file = 0;
+        // retrieve enpassant
+        for c in itt.by_ref() {
+            match c {
+                r @ 'a'..='h' => rank = r as u8 - 'a' as u8,
+                n @ '1'..='8' => file = n as u8 - '1' as u8,
+                '-' => continue,
+                ' ' => break,
+                _ => panic!("unrecognized FEN char for enpassant"),
+            }
+        }
+        Self::set(&mut enpassant, file + (8 * rank));
+
+        // for now skip number of moves
+
+        Self {
+            b_pawn,
+            b_rook,
+            b_knight,
+            b_bishop,
+            b_queen,
+            b_king,
+            w_pawn,
+            w_rook,
+            w_knight,
+            w_bishop,
+            w_queen,
+            w_king,
+            enpassant,
+            castling,
+            current_to_move,
+        }
+    }
+}
 
 impl core::fmt::Display for Board {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
@@ -459,7 +578,7 @@ impl core::fmt::Display for Board {
 
             if row == 3 {
                 write!(f, " {} to move", self.current_to_move)?;
-            } 
+            }
 
             square_color = !square_color;
         }
@@ -467,4 +586,3 @@ impl core::fmt::Display for Board {
         write!(f, "\n  ╚════════╝\n   {}\n", abc)
     }
 }
-
