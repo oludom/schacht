@@ -1,5 +1,5 @@
 use clap::{arg, command, value_parser, ArgAction, Command};
-use schacht::board::Board;
+use schacht::board::{self, Board, DebugDisplay};
 
 fn main() {
     let matches = command!()
@@ -14,4 +14,8 @@ fn main() {
 
     let b = Board::from(position);
     println!("{}", b);
+
+    println!("BLACK: \n{}", b.get_black().debug_print());
+    println!("WHITE: \n{}", b.get_white().debug_print());
+    println!("EMPTY: \n{}", b.get_empty_squares().debug_print());
 }
