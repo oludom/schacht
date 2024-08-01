@@ -1,0 +1,24 @@
+use super::*;
+
+
+const LOOKUP_QUEEN: [BitBoard; 64] = [
+{queen_list}
+];
+
+const LOOKUP_BISHOP: [BitBoard; 64] = [
+{bishop_list}
+];
+
+const LOOKUP_ROOK: [BitBoard; 64] = [
+{rook_list}
+];
+
+const LOOKUP_KNIGHT: [BitBoard; 64] = [
+{knight_list}
+];
+
+const LOOKUP_KING: [BitBoard; 64] = [
+{king_list}
+];
+
+

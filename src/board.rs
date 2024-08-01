@@ -8,7 +8,7 @@ pub trait DebugDisplay {
     }
 }
 
-type BitBoard = u64;
+pub type BitBoard = u64;
 
 impl DebugDisplay for BitBoard {
     fn debug_print(&self) -> String {
@@ -62,17 +62,17 @@ pub struct Board {
     current_to_move: Color,
 }
 
-const WIDTH: u8 = 8;
-const HEIGHT: u8 = 8;
+pub const WIDTH: u8 = 8;
+pub const HEIGHT: u8 = 8;
 
-const RANK8: u8 = 56;
-const RANK7: u8 = 48;
-const RANK6: u8 = 40;
-const RANK5: u8 = 32;
-const RANK4: u8 = 24;
-const RANK3: u8 = 16;
-const RANK2: u8 = 8;
-const RANK1: u8 = 0;
+pub const RANK8: u8 = 56;
+pub const RANK7: u8 = 48;
+pub const RANK6: u8 = 40;
+pub const RANK5: u8 = 32;
+pub const RANK4: u8 = 24;
+pub const RANK3: u8 = 16;
+pub const RANK2: u8 = 8;
+pub const RANK1: u8 = 0;
 const POSITION_CASTLING_KING: u8 = 1;
 const POSITION_CASTLING_QUEEN: u8 = 6;
 
